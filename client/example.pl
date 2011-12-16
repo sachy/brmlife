@@ -15,12 +15,11 @@ use IO::Socket;
 
 $/ = "\r\n";
 
-sub tick($) {
-	my ($socket) = @_;
+sub tick($$) {
+	my ($socket, $state) = @_;
 
 	# read message from socket and parse it
 	my $line = '';
-	my %state = ();
 	print "\n";
 	while ( chomp($line = <$socket>) ) {
 		print "# $line\n";
@@ -41,23 +40,21 @@ sub tick($) {
 
 		if ($type eq 'tick') {
 			$value =~ /^\d+$/ or die "[ee] type tick wrong value ($value)\n";
-			$state{tick} =  $value;
+			$state->{tick} =  $value;
 
 		} elsif ($type eq 'energy') {
 			$value =~ /^\d+$/ or die "[ee] type energy wrong value ($value)\n";
-			$state{energy} =  $value;
+			$state->{energy} =  $value;
 
 		} elsif ($type eq 'visual') {
 			$value =~ /^([^ ][^ ] )+([^ ][^ ])$/ or die "[ee] type visual wrong value ($value)\n";
-			$state{visual} = [ split(" ", $value) ];
+			$state->{visual} = [ split(" ", $value) ];
 		}
 	}
-	
-	%state;
 }
 
-sub take_action($%) {
-	my ($socket, %state) = @_;
+sub take_action($$) {
+	my ($socket, $state) = @_;
 
 	# FIXME: We use a common direction choice for both move_dir
 	# and attack_dir, but in fact the agent can do both actions
@@ -80,12 +77,12 @@ sub take_action($%) {
 		[0, -2], [1, -2], [2, -2], [2, -1], [2, 0], [2, 1], [2, 2], [1, 2], [0, 2], [-1, 2], [-2, 2], [-2, 1], [-2, 0], [-2, -1], [-2, -2], [-1, -2],
 	);
 
-	my $max = $dirs[1];
+	my $max = $dirs[0];
 	# Default direction in case of nothing interesting in the vicinity
 	# is [1, -1].
 
-	for my $i (0..$#{$state{visual}}) {
-		my ($type, $agent) = split(//, $state{visual}->[$i]);
+	for my $i (0..$#{$state->{visual}}) {
+		my ($type, $agent) = split(//, $state->{visual}->[$i]);
 		my $dir = $vdirs[$i];
 
 		if (abs($dir->[0]) > 1 or abs($dir->[1]) > 1) {
@@ -116,13 +113,14 @@ sub take_action($%) {
 		}
 	}
 
-	print "moves ".join(", ", @move)." => ($max->[0],$max->[1])\n";
+	print "moves ".join(", ", @move)." => (".dirindex($max).":$max->[0],$max->[1])\n";
 
 	if ($attack[dirindex($max)]) {
 		print $socket "attack_dir $max->[0] $max->[1]\r\n";
 	} else {
 		print $socket "move_dir $max->[0] $max->[1]\r\n";
 	}
+	print $socket "secrete 65536 1\r\n";
 	print $socket "\r\n";
 }
 
@@ -142,18 +140,24 @@ $socket = IO::Socket::INET->new(
 print "[ii] connected\r\n";
 
 # negotiate attributs
-print $socket "move 1.0\r\n";
-print $socket "attack 1.0\r\n";
-print $socket "defense 1.0\r\n";
+if ($ARGV[1]) {
+	print "[ii] recovering agent $ARGV[1]\r\n";
+	print $socket "agent_id $ARGV[1]\r\n";
+} else {
+	print $socket "move 1.0\r\n";
+	print $socket "attack 1.0\r\n";
+	print $socket "defense 1.0\r\n";
+}
 print $socket "\r\n";
 print "[ii] agent created\r\n";
 
-my %state = ();
-while (%state = tick($socket)) {
-	print $state{energy} . "\n";
-	print "[", join('], [', @{$state{visual}}), "]\n";
+my $state = {};
+while (1) {
+	tick($socket, $state);
+	print $state->{energy} . "\n";
+	print "[", join('], [', @{$state->{visual}}), "]\n";
 
-	take_action($socket, %state);
+	take_action($socket, $state);
 }
 
 shutdown($socket, 2);
