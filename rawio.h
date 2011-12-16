@@ -1,12 +1,18 @@
 #ifndef RAWIO
+//RAW I/O FOR 3rd APPS DATA PROCESSING
 #define RAWIO
+
+#define MAP_DEAD_AGENT 'a'
+#define MAP_ALIVE_AGENT 'A'
+#define MAP_HERB 'x'
+#define MAP_FREE ' '
 
 #include "map.h"
 #include <fstream>
 #include <iostream>
 
 int rawio_map(map *map)
-{
+{ //output map
 	std::ofstream mapout;
 	mapout.open("rawio_map",std::ios::out|std::ios::trunc);
 	if(mapout.is_open())
@@ -24,7 +30,7 @@ int rawio_map(map *map)
 }
 
 int rawio_cfg(map *map)
-{
+{//output world configuration
 	std::ofstream cfgout;
 	cfgout.open("rawio_cfg",std::ios::out|std::ios::trunc);
 	if(cfgout.is_open())
@@ -36,4 +42,5 @@ int rawio_cfg(map *map)
 	}
 	return -1;
 }
+
 #endif
